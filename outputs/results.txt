@@ -1,0 +1,325 @@
+CodeAlpha Data Science Internship - Task 3: Car Price Prediction
+All numbers below were produced by running src/car_price_prediction.py
+
+======================================================================
+1. DATA INSPECTION (raw dataset)
+======================================================================
+Shape: 301 rows x 9 columns
+Column names: ['Car_Name', 'Year', 'Selling_Price', 'Present_Price', 'Driven_kms', 'Fuel_Type', 'Selling_type', 'Transmission', 'Owner']
+
+Data types:
+Car_Name             str
+Year               int64
+Selling_Price    float64
+Present_Price    float64
+Driven_kms         int64
+Fuel_Type            str
+Selling_type         str
+Transmission         str
+Owner              int64
+
+First 5 rows:
+  Car_Name  Year  Selling_Price  Present_Price  Driven_kms Fuel_Type Selling_type Transmission  Owner
+0     ritz  2014           3.35           5.59       27000    Petrol       Dealer       Manual      0
+1      sx4  2013           4.75           9.54       43000    Diesel       Dealer       Manual      0
+2     ciaz  2017           7.25           9.85        6900    Petrol       Dealer       Manual      0
+3  wagon r  2011           2.85           4.15        5200    Petrol       Dealer       Manual      0
+4    swift  2014           4.60           6.87       42450    Diesel       Dealer       Manual      0
+
+Statistical summary (numeric columns):
+           Year  Selling_Price  Present_Price  Driven_kms    Owner
+count   301.000        301.000        301.000     301.000  301.000
+mean   2013.628          4.661          7.628   36947.206    0.043
+std       2.892          5.083          8.643   38886.884    0.248
+min    2003.000          0.100          0.320     500.000    0.000
+25%    2012.000          0.900          1.200   15000.000    0.000
+50%    2014.000          3.600          6.400   32000.000    0.000
+75%    2016.000          6.000          9.900   48767.000    0.000
+max    2018.000         35.000         92.600  500000.000    3.000
+
+Missing values per column:
+Car_Name         0
+Year             0
+Selling_Price    0
+Present_Price    0
+Driven_kms       0
+Fuel_Type        0
+Selling_type     0
+Transmission     0
+Owner            0
+
+Total missing values: 0
+Duplicate rows (all 9 columns identical): 2
+
+Unique values of important categorical columns:
+  Fuel_Type: {'Petrol': 239, 'Diesel': 60, 'CNG': 2}
+  Selling_type: {'Dealer': 195, 'Individual': 106}
+  Transmission: {'Manual': 261, 'Automatic': 40}
+  Owner: {0: 290, 1: 10, 3: 1}
+  Car_Name: 98 unique names
+
+Year range: 2003 to 2018
+
+Target (Selling_Price) distribution:
+count    301.000
+mean       4.661
+std        5.083
+min        0.100
+25%        0.900
+50%        3.600
+75%        6.000
+max       35.000
+  Skewness: 2.493
+  Vehicles with Selling_Price > 20: 7
+
+Vehicle types (judged from names, documentation only): 200 cars and 101 motorcycles/scooters. The file is called 'car data' but includes both.
+
+======================================================================
+2. DATA CLEANING
+======================================================================
+Decision 1: Stripped extra spaces in column names and text values (e.g. 'Bajaj  ct 100' had a double space).
+  Unique Car_Name values: 98 before -> 97 after tidy-up.
+Decision 2: Converted Selling_Price to numeric. Non-numeric values found: 0.
+Decision 3: No missing values exist, so no imputation was needed.
+
+Duplicate rows found: 2. The rows involved (original index shown):
+    Car_Name  Year  Selling_Price  Present_Price  Driven_kms Fuel_Type Selling_type Transmission  Owner
+15    ertiga  2016           7.75          10.79       43000    Diesel       Dealer       Manual      0
+17    ertiga  2016           7.75          10.79       43000    Diesel       Dealer       Manual      0
+51  fortuner  2015          23.00          30.61       40000    Diesel       Dealer    Automatic      0
+93  fortuner  2015          23.00          30.61       40000    Diesel       Dealer    Automatic      0
+Decision 4: REMOVED the duplicates (kept the first copy of each). Rows: 301 -> 299.
+  Why: the copies match in ALL 9 columns, including exact mileage and price, so they are most likely
+  accidental double entries. Keeping them would let the same car land in both the training and
+  test sets, which would make test scores look better than they really are (a form of leakage).
+
+Sanity checks for suspicious or impossible values:
+  Selling_Price <= 0: 0
+  Present_Price <= 0: 0
+  Driven_kms <= 0: 0
+  Owner values found: [0, 1, 3] (no negative values)
+  Selling_Price greater than Present_Price: 0
+  Very high mileage (>= 300,000 km): 1 row(s)
+      Car_Name  Year  Selling_Price  Present_Price  Driven_kms Fuel_Type Selling_type Transmission  Owner
+194  Activa 3g  2008           0.17           0.52      500000    Petrol   Individual    Automatic      0
+Decision 5: No impossible values were found. The one very high-mileage row is unusual but not
+  impossible, and there is no evidence it is an error, so it was KEPT (it is documented as a limitation).
+
+======================================================================
+3. FEATURE ENGINEERING
+======================================================================
+Created Car_Age = 2018 - Year
+  Reference year = the newest Year in the dataset (2018). The listings are historical,
+  so using 2026 would add the same constant to every car and make ages look unrealistically large;
+  a constant shift would not help the models anyway.
+  Car_Age range: 0 to 15 years
+Year is NOT used as a model input because it carries exactly the same information as Car_Age.
+Car_Name is NOT used as a model input: it has about 98 different values for fewer than 300 rows,
+many appear only once or twice, and one-hot encoding would create ~98 mostly-empty columns
+(easy overfitting). Present_Price and Fuel_Type already describe the vehicle's class and price level.
+No other features were created, to keep the project simple.
+
+======================================================================
+4. EXPLORATORY DATA ANALYSIS (charts saved in outputs/images/)
+======================================================================
+
+[01] Selling price distribution
+  Mean = 4.59, median = 3.51, min = 0.10, max = 35.00, skewness = 2.54.
+  The mean is higher than the median and 6 vehicles sell above 20, so the distribution is right-skewed: most listings are low-priced with a few expensive ones.
+
+[02] Present price vs selling price
+  Pearson r = 0.876, Spearman rho = 0.907: a strong positive association.
+  Selling price is above present price in 0 rows (no listing sells for more than its present price).
+  1 car with Present_Price above 40 (max 92.6) stretches the left chart, so a zoomed panel is also shown.
+
+[03] Car age vs selling price
+  Pearson r = -0.234 (weak negative). Median price for cars aged 0-3 years = 5.15 vs 2.10 for cars aged 8+ years.
+  Only 1 car has Car_Age = 0, so the first point of the median line is a single car.
+  Older cars tend to be cheaper, but the trend is noisy because the original price of the cars differs a lot.
+
+[04] Driven kms vs selling price
+  Pearson r = 0.029 with all rows and 0.088 without the 1 row above 300,000 km.
+  The relationship is weak. One extreme mileage value distorts the full chart, so a zoomed panel is also shown.
+
+[05] Selling price by fuel type
+           count  median   mean
+Fuel_Type                      
+CNG            2    3.10   3.10
+Diesel        58    7.60  10.10
+Petrol       239    2.65   3.26
+  Highest median price: Diesel (7.60); lowest: Petrol (2.65). Very small group(s), not reliable: CNG (n=2).
+
+[06] Selling price by transmission
+              count  median  mean
+Transmission                     
+Automatic        39    5.75  9.07
+Manual          260    3.25  3.92
+  Highest median price: Automatic (5.75); lowest: Manual (3.25).
+
+[07] Selling price by selling type
+              count  median  mean
+Selling_type                     
+Dealer          193    5.25  6.63
+Individual      106    0.52  0.87
+  Vehicle mix by selling type (car vs motorcycle/scooter, judged from the name):
+Car_Name      car  two-wheeler
+Selling_type                  
+Dealer        193            0
+Individual      5          101
+  Highest median price: Dealer (5.25); lowest: Individual (0.52).
+  The dataset mixes cars with motorcycles/scooters, so any gap between selling types may partly reflect vehicle type and original price rather than the selling channel. No causal conclusion is drawn.
+
+[08] Correlation heatmap (Pearson)
+Present_Price    0.876
+Driven_kms       0.029
+Car_Age         -0.234
+Owner           -0.088
+  Present_Price has the strongest linear correlation with Selling_Price. Correlation shows association only, not cause and effect, and Pearson r is sensitive to extreme values.
+  (Year is not shown separately: it is exactly the opposite of Car_Age.)
+
+======================================================================
+5. TRAIN / TEST SPLIT AND PREPROCESSING
+======================================================================
+Split: 239 training rows (80%) and 60 test rows (20%), random_state = 42.
+Training data = the rows the models learn from. Testing data = rows kept hidden until the very end, used to check how the model does on cars it has never seen.
+Why split: scoring a model on the same rows it learned from would reward memorising, not learning.
+Model inputs: numeric = ['Present_Price', 'Driven_kms', 'Car_Age', 'Owner']; categorical = ['Fuel_Type', 'Selling_type', 'Transmission']; target = Selling_Price
+Preprocessing (StandardScaler + OneHotEncoder) lives inside each Pipeline, so it is fitted on training data only.
+Fuel_Type in training set: {'Petrol': 193, 'Diesel': 45, 'CNG': 1}
+Fuel_Type in test set: {'Petrol': 46, 'Diesel': 13, 'CNG': 1}
+(OneHotEncoder uses handle_unknown='ignore', so a category missing from training does not crash prediction.)
+
+======================================================================
+6. MODELS TESTED
+======================================================================
+Linear Regression, Decision Tree, Random Forest (200 trees), Gradient Boosting, KNN (k = 5).
+All use library default settings (apart from a fixed random_state); no hyperparameter tuning was done.
+
+======================================================================
+7. CROSS-VALIDATION (5-fold, training data only)
+======================================================================
+Each pipeline is re-fitted inside every fold, so the preprocessing is learned only from that fold's training part. The test set is NOT used here.
+                   CV_R2_mean  CV_R2_std  CV_RMSE_mean  CV_RMSE_std  CV_MAE_mean
+Model                                                                           
+Linear Regression      0.8846     0.0288        1.6479       0.4387       1.1035
+Decision Tree          0.8945     0.0647        1.5912       0.8204       0.7664
+Random Forest          0.8921     0.0881        1.5202       0.9372       0.6773
+Gradient Boosting      0.8829     0.1099        1.5925       1.1239       0.7066
+KNN                    0.8898     0.0641        1.6085       0.8065       0.9305
+
+======================================================================
+8. TEST-SET EVALUATION (all models fitted on the training set only)
+======================================================================
+                   Test_MAE  Test_RMSE  Test_R2  Train_R2
+Model                                                    
+Linear Regression    1.4725     2.5245   0.7527    0.9046
+Decision Tree        1.4337     3.0558   0.6377    1.0000
+Random Forest        1.5476     3.7566   0.4525    0.9817
+Gradient Boosting    1.2365     2.8517   0.6845    0.9966
+KNN                  1.1019     2.0129   0.8428    0.9297
+
+Metric guide: MAE = average size of the error (lower is better). RMSE = like MAE but punishes big mistakes more (lower is better). R2 = share of price variation the model explains (higher is better, max 1).
+Train_R2 is shown only to spot overfitting: a much higher train R2 than test R2 means the model memorised the training data.
+
+======================================================================
+9. FINAL MODEL SELECTION
+======================================================================
+Selected final model: Decision Tree
+Selection rule (fixed in the code before any test result was seen): highest mean cross-validation R2 on the TRAINING data, with lower CV RMSE as the tie-breaker.
+  Its CV R2 = 0.8945 (std 0.0647), CV RMSE = 1.5912.
+  Honest caveat: mean CV R2 of all five models lies within 0.0117 of each other, while the fold-to-fold std of the selected model is 0.0647. Cross-validation therefore cannot clearly separate the models; the choice is close to a tie.
+  Note: the test ranking is different - KNN has the highest test R2. The test set was NOT used to choose, because that would leak test information into model selection. With only 60 test rows, the test ranking can be strongly affected by chance.
+  Final model test results: MAE = 1.4337, RMSE = 3.0558, R2 = 0.6377
+
+======================================================================
+10. MODEL CHARTS AND INTERPRETATION
+======================================================================
+[09] Model comparison chart saved (CV and test R2 / RMSE; bars start at zero).
+[10] Actual vs predicted chart saved. Points close to the red dashed line are accurate predictions.
+[11] Residual analysis saved (residual = actual - predicted).
+  Mean residual = -0.469, std = 3.045, largest absolute residual = 13.500.
+  Three largest errors (test rows):
+    camry (2006, Owner = 3): actual = 2.50, predicted = 16.00, Present_Price = 23.73
+    corolla altis (2008, Owner = 0): actual = 4.00, predicted = 14.50, Present_Price = 22.78
+    fortuner (2017, Owner = 0): actual = 33.00, predicted = 23.00, Present_Price = 36.23
+  The two largest errors make up 52% of the final model's total squared test error (which is why RMSE is much bigger than MAE).
+  Mean absolute residual for test vehicles priced below 10: 1.215 (n = 55); priced 10 or above: 3.840 (n = 5).
+  Interpretation: errors are larger for the higher-priced vehicles, but only 5 test vehicles are in that group, so this should not be over-interpreted.
+
+Feature importance (final model)
+  Built-in importance (encoded feature names):
+                Feature  Importance
+          Present_Price      0.9117
+                Car_Age      0.0751
+             Driven_kms      0.0064
+    Transmission_Manual      0.0050
+       Fuel_Type_Petrol      0.0012
+ Transmission_Automatic      0.0003
+Selling_type_Individual      0.0002
+                  Owner      0.0001
+       Fuel_Type_Diesel      0.0000
+    Selling_type_Dealer      0.0000
+          Fuel_Type_CNG      0.0000
+  Permutation importance on the test set (original columns, 30 repeats):
+      Feature  Importance    Std
+Present_Price      1.3665 0.2777
+      Car_Age      0.4412 0.1182
+    Fuel_Type      0.0387 0.0195
+   Driven_kms      0.0188 0.0166
+ Selling_type      0.0033 0.0164
+        Owner     -0.0000 0.0000
+ Transmission     -0.1585 0.0393
+[12] Feature importance chart saved. Importance shows what the model relies on; it does not prove cause and effect.
+
+======================================================================
+11. SAMPLE PREDICTIONS (model output, not a guaranteed market price)
+======================================================================
+
+Sample 1 - typical car (dataset medians / most common categories)
+  Input:
+    Present_Price: 6.1
+    Driven_kms: 32000
+    Car_Age: 4 (Year 2014)
+    Owner: 0
+    Fuel_Type: Petrol
+    Selling_type: Dealer
+    Transmission: Manual
+  Predicted Selling_Price (model prediction): 5.40 dataset price units
+
+Sample 2 - newer premium diesel automatic
+  Input:
+    Present_Price: 20.0
+    Driven_kms: 40000
+    Car_Age: 2 (Year 2016)
+    Owner: 0
+    Fuel_Type: Diesel
+    Selling_type: Dealer
+    Transmission: Automatic
+  Predicted Selling_Price (model prediction): 14.25 dataset price units
+
+Note: these are model predictions learned from a small historical dataset, not guaranteed market prices.
+
+======================================================================
+12. IMPORTANT OBSERVATIONS
+======================================================================
+- Dataset: 301 raw rows, 2 duplicates removed, 299 rows used for modelling.
+- Final model (by cross-validation): Decision Tree.
+- Most influential input for the final model (permutation importance): Present_Price.
+- Models that fit the training data almost perfectly (train R2 >= 0.98): Decision Tree, Random Forest, Gradient Boosting. A big gap between train R2 and test R2 is a sign of overfitting.
+- 5 of 5 models score lower on the test set than in cross-validation. CV R2 values lie between 0.88 and 0.89, but test R2 ranges from 0.45 to 0.84. With only 60 test rows, a few unusual vehicles can change the score a lot, so the test ranking of models is not very reliable.
+- Selling_type is closely tied to vehicle type here: 101 of 106 'Individual' listings are motorcycles/scooters, while 0 of 193 'Dealer' listings are. Its effect on price should not be read as a pure selling-channel effect.
+- Permutation importance can be negative or near zero: shuffling that column did not hurt the test score (the feature was not useful on these 60 rows). It does not mean the feature lowers prices.
+
+======================================================================
+13. LIMITATIONS
+======================================================================
+- Small dataset: only 299 rows after cleaning, so the test set has just 60 rows. One random split gives a noisy estimate.
+- Data is historical (Year 2003-2018) and has no market-date column; the model does not know today's prices.
+- Price units are not stated in the CSV (they look like lakhs of Indian rupees, but this was not verified).
+- The 'car' file also contains 101 motorcycles/scooters, so it is not a pure car dataset.
+- Rare categories: only 2 CNG vehicles, only 11 rows with Owner above 0 (just 1 with Owner = 3), and 39 automatics; the models cannot learn these small groups reliably.
+- Extreme values were kept: maximum Driven_kms = 500,000 and maximum Present_Price = 92.6.
+- Important real-world factors are missing: city, variant/model trim, condition, accident history, service records.
+- Car_Name was not used, so the model cannot separate two models with similar price and age.
+- Models use default settings (no tuning), and the final model was fitted on the training split only.
+- Feature importance and correlations show association, not causation.
